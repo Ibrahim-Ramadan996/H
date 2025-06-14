@@ -5,7 +5,7 @@ import joblib
 import pandas as pd
 import os
 
-# نموذج البيانات للممرضين
+# تعريف شكل الاستجابة
 class NurseResponse(BaseModel):
     NurseID: int
     FName: str
@@ -21,23 +21,22 @@ class NurseResponse(BaseModel):
     Comment: str
     Score: float
 
-# إنشاء التطبيق
+# إنشاء تطبيق FastAPI
 app = FastAPI(title="نظام ترشيح الممرضين")
 
+# نقطة النهاية لترشيح الممرضين حسب المدينة
 @app.get("/nurses/{city}", response_model=List[NurseResponse])
 async def get_nurses_by_city(city: str):
     try:
-        print("📁 ملفات المشروع:", os.listdir())
+        print("📁 الملفات الموجودة:", os.listdir())
 
         # تحميل البيانات
-        df = joblib.load("nurse_data.pkl")
+        df = joblib.load("nurse_data_frame.joblib")
 
-        # تنظيف المدينة
+        # تنظيف وتصفية المدينة
         city_normalized = city.strip().lower()
         df = df[df['City'].notna()].copy()
         df["City_clean"] = df["City"].astype(str).str.strip().str.lower()
-
-        # فلترة البيانات
         filtered = df[df["City_clean"] == city_normalized].sort_values("Score", ascending=False)
 
         if filtered.empty:
@@ -46,6 +45,12 @@ async def get_nurses_by_city(city: str):
         return filtered.drop(columns=["City_clean"]).to_dict("records")
 
     except FileNotFoundError:
-        raise HTTPException(status_code=500, detail="⚠️ ملف nurse_data.pkl غير موجود.")
+        raise HTTPException(status_code=500, detail="⚠️ ملف البيانات غير موجود.")
     except Exception as e:
-        raise HTTPException(status_code=500, detail=f"⚠️ خطأ داخلي: {str(e)}")
+        raise HTTPException(status_code=500, detail=f"⚠️ خطأ داخلي في السيرفر: {str(e)}")
+
+# تشغيل التطبيق عند التشغيل المباشر (مثل Railway)
+if __name__ == "__main__":
+    import uvicorn
+    port = int(os.environ.get("PORT", 8000))
+    uvicorn.run("main:app", host="0.0.0.0", port=port)
